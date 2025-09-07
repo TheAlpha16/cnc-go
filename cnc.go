@@ -87,10 +87,7 @@ func (c *cncImpl) processMessages() {
 			// Execute the command using the registry in a separate goroutine
 			// to avoid blocking message processing
 			go func(cmd Command) {
-				if err := c.registry.Execute(c.ctx, cmd); err != nil {
-					// In a production system, you might want to add proper logging
-					// or error handling mechanisms here
-				}
+				c.registry.Execute(c.ctx, cmd)
 			}(command)
 
 		case <-c.ctx.Done():

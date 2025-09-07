@@ -89,7 +89,7 @@ func (v *ValkeyTransport) subscriptionLoop() {
 	}()
 
 	// Create subscription and start receiving messages
-	err := v.client.Receive(v.ctx, v.client.B().Subscribe().Channel(v.channel).Build(), func(msg valkey.PubSubMessage) {
+	v.client.Receive(v.ctx, v.client.B().Subscribe().Channel(v.channel).Build(), func(msg valkey.PubSubMessage) {
 		// Only process messages from our channel
 		if msg.Channel != v.channel {
 			return
@@ -98,7 +98,6 @@ func (v *ValkeyTransport) subscriptionLoop() {
 		// Parse the command
 		var command Command
 		if err := json.Unmarshal([]byte(msg.Message), &command); err != nil {
-			// Skip invalid messages - could add logging here
 			return
 		}
 
@@ -111,14 +110,8 @@ func (v *ValkeyTransport) subscriptionLoop() {
 			return
 		default:
 			// Channel full, drop message to prevent blocking
-			// In production, you might want to log this
 		}
 	})
-
-	if err != nil {
-		// In a production system, you might want to implement retry logic
-		// or notify about the error through a callback
-	}
 }
 
 // Messages returns a channel that receives commands from the transport
