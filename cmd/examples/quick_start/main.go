@@ -7,11 +7,12 @@ import (
 	"time"
 
 	"github.com/TheAlpha16/cnc-go"
+	"github.com/valkey-io/valkey-go"
 )
 
 func main() {
 	// Create CNC instance with Valkey transport
-	cncInstance, err := cnc.NewCNCWithValkeyAddress("localhost:6379", "my-commands")
+	cncInstance, err := cnc.NewCNCWithValkeyAddress("localhost:6379", "my-commands", []valkey.ClientOption{})
 	if err != nil {
 		log.Fatalf("Failed to create CNC: %v", err)
 	}
