@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
+	"time"
 
 	"github.com/valkey-io/valkey-go"
 )
@@ -19,21 +20,7 @@ type ValkeyTransport struct {
 	msgChan      chan Command
 	closedChan   chan struct{}
 	once         sync.Once
-}
-
-// NewValkeyTransport creates a new valkey transport instance
-func NewValkeyTransport(client valkey.Client, channel string) Transport {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	return &ValkeyTransport{
-		client:     client,
-		channel:    channel,
-		ctx:        ctx,
-		cancel:     cancel,
-		connected:  true,
-		msgChan:    make(chan Command, 100), // Buffered channel for message queue
-		closedChan: make(chan struct{}),
-	}
+	options      Options
 }
 
 // Publish publishes a command to the valkey channel
@@ -88,30 +75,77 @@ func (v *ValkeyTransport) subscriptionLoop() {
 		v.mu.Unlock()
 	}()
 
-	// Create subscription and start receiving messages
-	v.client.Receive(v.ctx, v.client.B().Subscribe().Channel(v.channel).Build(), func(msg valkey.PubSubMessage) {
-		// Only process messages from our channel
-		if msg.Channel != v.channel {
+	retryDelay := 100 * time.Millisecond
+	maxRetryDelay := 30 * time.Second
+	subscriber := v.client.B().Subscribe().Channel(v.channel).Build()
+
+	for {
+		if v.shouldStop() {
 			return
 		}
 
-		// Parse the command
-		var command Command
-		if err := json.Unmarshal([]byte(msg.Message), &command); err != nil {
+		// Create subscription and start receiving messages
+		// This call will block until an error occurs or context is cancelled
+		err := v.client.Receive(v.ctx, subscriber, v.handleMessage)
+
+		if err != nil {
+			// Check if we're shutting down
+			if v.shouldStop() {
+				return
+			}
+
+			// If Receive returns an error, we retry after a delay
+			// This handles network disconnections, server restarts, etc.
+			// retry with backoff
+			time.Sleep(retryDelay)
+			retryDelay *= 2
+			if retryDelay > maxRetryDelay {
+				retryDelay = maxRetryDelay
+			}
+			continue
+		}
+
+		if v.shouldStop() {
 			return
 		}
 
-		// Send to message channel (non-blocking to prevent deadlock)
-		select {
-		case v.msgChan <- command:
-		case <-v.closedChan:
-			return
-		case <-v.ctx.Done():
-			return
-		default:
-			// Channel full, drop message to prevent blocking
+		// If we get here, v.client.Receive returned without error
+		// Reset retry delay on successful connection
+		retryDelay = 100 * time.Millisecond
+
+		// Brief pause before reconnecting
+		time.After(100 * time.Millisecond)
+	}
+}
+
+// handleMessage processes individual messages from the subscription
+func (v *ValkeyTransport) handleMessage(msg valkey.PubSubMessage) {
+	// Only process messages from our channel
+	if msg.Channel != v.channel {
+		return // This only exits the callback, not the subscription loop
+	}
+
+	// Parse the command
+	var command Command
+	if err := json.Unmarshal([]byte(msg.Message), &command); err != nil {
+		if v.options.OnError != nil {
+			v.options.OnError(v.ctx, Command{}, err)
 		}
-	})
+		return
+	}
+
+	// Send to message channel (non-blocking to prevent deadlock)
+	select {
+	case v.msgChan <- command:
+		// Successfully sent message
+	case <-v.closedChan:
+		return
+	case <-v.ctx.Done():
+		return
+	default:
+		// Channel full, drop message to prevent blocking
+		// In production, you might want to log this or implement backpressure
+	}
 }
 
 // Messages returns a channel that receives commands from the transport
@@ -151,6 +185,17 @@ func (v *ValkeyTransport) IsConnected() bool {
 	return v.connected
 }
 
+func (v *ValkeyTransport) shouldStop() bool {
+	select {
+	case <-v.closedChan:
+		return true
+	case <-v.ctx.Done():
+		return true
+	default:
+		return false
+	}
+}
+
 // NewValkeyClient creates a new valkey client with common configuration
 func NewValkeyClient(address string, options ...valkey.ClientOption) (valkey.Client, error) {
 	defaultOption := valkey.ClientOption{
@@ -174,4 +219,25 @@ func NewValkeyClient(address string, options ...valkey.ClientOption) (valkey.Cli
 	}
 
 	return client, nil
+}
+
+// NewValkeyTransport creates a new valkey transport instance
+func NewValkeyTransport(client valkey.Client, channel string, opts ...Option) Transport {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	options := defaultOptions()
+	for _, opt := range opts {
+		opt(&options)
+	}
+
+	return &ValkeyTransport{
+		client:     client,
+		channel:    channel,
+		ctx:        ctx,
+		cancel:     cancel,
+		connected:  true,
+		msgChan:    make(chan Command, options.MsgBufferSize), // Buffered channel for message queue
+		closedChan: make(chan struct{}),
+		options:    options,
+	}
 }

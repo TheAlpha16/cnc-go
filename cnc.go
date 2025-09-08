@@ -24,6 +24,7 @@ type cncImpl struct {
 	wg        sync.WaitGroup
 	started   bool
 	mu        sync.RWMutex
+	options   Options
 }
 
 // RegisterHandler registers a command handler with the registry
@@ -87,7 +88,11 @@ func (c *cncImpl) processMessages() {
 			// Execute the command using the registry in a separate goroutine
 			// to avoid blocking message processing
 			go func(cmd Command) {
-				c.registry.Execute(c.ctx, cmd)
+				if err := c.registry.Execute(c.ctx, cmd); err != nil {
+					if c.options.OnError != nil {
+						c.options.OnError(c.ctx, cmd, err)
+					}
+				}
 			}(command)
 
 		case <-c.ctx.Done():
@@ -129,29 +134,36 @@ func (c *cncImpl) Shutdown() error {
 }
 
 // NewCNC creates a new CNC instance with the provided transport
-func NewCNC(transport Transport) CNC {
+func NewCNC(transport Transport, opts ...Option) CNC {
 	ctx, cancel := context.WithCancel(context.Background())
+
+	options := defaultOptions()
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	return &cncImpl{
 		registry:  NewRegistry(),
 		transport: transport,
 		ctx:       ctx,
 		cancel:    cancel,
+		options:   options,
 	}
 }
 
 // NewCNCWithValkey creates a new CNC instance with a Valkey transport
-func NewCNCWithValkey(client valkey.Client, channel string) CNC {
-	transport := NewValkeyTransport(client, channel)
-	return NewCNC(transport)
+func NewCNCWithValkey(client valkey.Client, channel string, opts ...Option) CNC {
+	transport := NewValkeyTransport(client, channel, opts...)
+	return NewCNC(transport, opts...)
 }
 
 // NewCNCWithValkeyAddress creates a new CNC instance with a Valkey transport using an address
-func NewCNCWithValkeyAddress(address, channel string, options ...valkey.ClientOption) (CNC, error) {
-	client, err := NewValkeyClient(address, options...)
+func NewCNCWithValkeyAddress(address, channel string, clientOpts []valkey.ClientOption, opts ...Option) (CNC, error) {
+	client, err := NewValkeyClient(address, clientOpts...)
 	if err != nil {
 		return nil, err
 	}
 
-	transport := NewValkeyTransport(client, channel)
-	return NewCNC(transport), nil
+	transport := NewValkeyTransport(client, channel, opts...)
+	return NewCNC(transport, opts...), nil
 }
