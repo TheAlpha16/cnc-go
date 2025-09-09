@@ -1,8 +1,6 @@
 # cnc-go
 A lightweight Go package for distributed command execution and coordination across services
 
----
-
 > [!note]
 > This version is written by Claude after explaining the requirements and providing some code that I used somewhere else
 > I haven't tested it extensively, please use with caution
@@ -23,8 +21,6 @@ A lightweight Go package for distributed command execution and coordination acro
 
 - 🛠️ Gracefully start, run, and shutdown CNC workers
 
----
-
 
 ## 🤔 Why?
 
@@ -33,7 +29,6 @@ In distributed systems, some actions — like invalidating caches, reloading con
 Instead of building ad-hoc RPCs or reinventing messaging, **cnc-go provides a simple abstraction**:
 publish a command once and have every node execute it reliably.
 
----
 
 ## 🚀 Features
 
@@ -47,7 +42,6 @@ publish a command once and have every node execute it reliably.
 
 - ✅ Unit tested & extensible
 
----
 
 ## 📦 Installation
 
@@ -55,7 +49,6 @@ publish a command once and have every node execute it reliably.
 go get github.com/TheAlpha16/cnc-go
 ```
 
----
 
 ## 🚀 Quick Start
 
@@ -121,7 +114,6 @@ func main() {
 }
 ```
 
----
 
 ## 📖 API Reference
 
@@ -208,7 +200,6 @@ var (
 )
 ```
 
----
 
 ## 🔌 Implementing Custom Transports
 
@@ -247,7 +238,6 @@ func (t *MyCustomTransport) IsConnected() bool {
 }
 ```
 
----
 
 ## 🧪 Testing
 
@@ -261,7 +251,6 @@ Run tests with coverage:
 go test -cover ./...
 ```
 
----
 
 ## 🤝 Contributing
 
@@ -271,13 +260,11 @@ go test -cover ./...
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
----
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
----
 
 ## 🏗️ Architecture
 
@@ -290,12 +277,12 @@ The package follows a clean separation of concerns:
 ```
 Commands ──┐
            ▼
-    ┌─────────────┐    ┌──────────────┐    ┌─────────────┐
-    │  Transport  │───▶│  Channel     │───▶│  CNC Core   │
-    │             │    │ <-chan Cmd   │    │             │
-    └─────────────┘    └──────────────┘    └─────────────┘
-                                                   │
-                                                   ▼
+    ┌─────────────┐    ┌──────────────┐    ┌────────────┐
+    │  Transport  │───▶│    Channel   │───▶│  CNC Core  │
+    │             │    │  <-chan Cmd  │    │            │
+    └─────────────┘    └──────────────┘    └────────────┘
+                                                  │
+                                                  ▼
                                            ┌─────────────┐
                                            │  Registry   │
                                            │  (Handlers) │
