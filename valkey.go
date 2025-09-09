@@ -114,7 +114,7 @@ func (v *ValkeyTransport) subscriptionLoop() {
 		retryDelay = 100 * time.Millisecond
 
 		// Brief pause before reconnecting
-		time.After(100 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
