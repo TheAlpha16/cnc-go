@@ -2,9 +2,9 @@
 A lightweight Go package for distributed command execution and coordination across services
 
 > [!note]
-> This version is written by Claude after explaining the requirements and providing some code that I used somewhere else
-> I haven't tested it extensively, please use with caution
-> I will update once I get the chance to test it thoroughly
+> This version is written by Claude after explaining the requirements and providing some code that I used somewhere else.
+> I haven't tested it extensively, please use with caution.
+> I will update once I get the chance to test it thoroughly.
 
 
 ## What it does
