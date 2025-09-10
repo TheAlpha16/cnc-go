@@ -1,6 +1,6 @@
 module github.com/TheAlpha16/cnc-go
 
-go 1.24.3
+go 1.24
 
 require github.com/valkey-io/valkey-go v1.0.64
 
